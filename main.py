@@ -41,19 +41,24 @@ prompt = tokenizer.apply_chat_template(
 
 
 def contrastive_generation(amateur, expert, prompt, max_tokens) -> str:
-    amateur.to("cuda")
-    expert.to("cuda")
-    device = expert.device
+    #device = expert.device
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-    generated_ids = input_ids
-    past_key_values_amateur = None
-    past_key_values_expert = None
+    generated_ids = input_ids.clone()
+    
+    # Initialize KV cache by running both models on the full prompt
+    with torch.no_grad():
+        amateur_outputs = amateur(input_ids, use_cache=True)
+        past_key_values_amateur = amateur_outputs.past_key_values
+        
+        expert_outputs = expert(input_ids, use_cache=True)
+        past_key_values_expert = expert_outputs.past_key_values
 
     for _ in range(max_tokens):
         # Use the last token for the next step prediction
         current_token_ids = generated_ids[:, -1:]
 
-        # 3. Get logits from both models using the KV cache
+        # Get logits from both models using the KV cache
         with torch.no_grad():
             # Get logits from the amateur model
             amateur_outputs = amateur(
@@ -69,28 +74,27 @@ def contrastive_generation(amateur, expert, prompt, max_tokens) -> str:
             logits_expert = expert_outputs.logits[:, -1, :]
             past_key_values_expert = expert_outputs.past_key_values
 
-        # 4. Combine logits using the contrastive decoding formula
-        # We work with logits to maintain numerical stability
-        contrastive_logits = 1.5 * logits_expert - 0.5 * logits_amateur
+        # Combine logits using the contrastive decoding formula
+        contrastive_logits = 1.4 * logits_expert - 0.6 * logits_amateur
 
-        # 5. Select the next token using greedy search (argmax)
+        # Select the next token using greedy search (argmax)
         next_token_id = torch.argmax(contrastive_logits, dim=-1).unsqueeze(-1)
 
-        # 6. Append the new token and check for EOS
+        # Append the new token and check for EOS
         generated_ids = torch.cat([generated_ids, next_token_id], dim=-1)
 
         if next_token_id.item() == tokenizer.eos_token_id:
             print("EOS token reached.")
             break
             
-    # 7. Decode the final generated sequence
-    # We skip the special tokens and the original prompt
+    # Decode the final generated sequence
+    # We skip the original prompt
     return tokenizer.decode(generated_ids[0][input_ids.shape[1]:], skip_special_tokens=True)
 
 
 
 def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
     torch_dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] >= 8 else torch.float32
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -106,7 +110,7 @@ def main():
     )
 
     print("Prompt:")
-    print(user_message)
+    print(prompt)
     print("\nGenerated Docstring:")
     print(generated_text)
 
