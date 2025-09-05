@@ -46,7 +46,7 @@ def contrastive_generation(amateur, expert, prompt, max_tokens) -> str:
     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
     generated_ids = input_ids.clone()
     
-    # Initialize KV cache by running both models on the full prompt
+    # KV cache
     with torch.no_grad():
         amateur_outputs = amateur(input_ids, use_cache=True)
         past_key_values_amateur = amateur_outputs.past_key_values
@@ -55,40 +55,32 @@ def contrastive_generation(amateur, expert, prompt, max_tokens) -> str:
         past_key_values_expert = expert_outputs.past_key_values
 
     for _ in range(max_tokens):
-        # Use the last token for the next step prediction
         current_token_ids = generated_ids[:, -1:]
 
-        # Get logits from both models using the KV cache
         with torch.no_grad():
-            # Get logits from the amateur model
             amateur_outputs = amateur(
                 current_token_ids, past_key_values=past_key_values_amateur, use_cache=True
             )
             logits_amateur = amateur_outputs.logits[:, -1, :]
             past_key_values_amateur = amateur_outputs.past_key_values
 
-            # Get logits from the expert model
             expert_outputs = expert(
                 current_token_ids, past_key_values=past_key_values_expert, use_cache=True
             )
             logits_expert = expert_outputs.logits[:, -1, :]
             past_key_values_expert = expert_outputs.past_key_values
 
-        # Combine logits using the contrastive decoding formula
+        # Set alpha = 0.6, tunable
         contrastive_logits = 1.4 * logits_expert - 0.6 * logits_amateur
 
-        # Select the next token using greedy search (argmax)
+		# token level greedy search
         next_token_id = torch.argmax(contrastive_logits, dim=-1).unsqueeze(-1)
 
-        # Append the new token and check for EOS
         generated_ids = torch.cat([generated_ids, next_token_id], dim=-1)
 
         if next_token_id.item() == tokenizer.eos_token_id:
-            print("EOS token reached.")
             break
-            
-    # Decode the final generated sequence
-    # We skip the original prompt
+        
     return tokenizer.decode(generated_ids[0][input_ids.shape[1]:], skip_special_tokens=True)
 
 
