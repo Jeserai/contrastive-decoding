@@ -10,6 +10,4 @@ I don't think contrastive decoding is widely or effectively used in practice. As
 
 Besides, the technique faces several practical challenges: (1) the need to maintain and serve two models increases infrastructure complexity; (2) the 2x inference cost makes it prohibitive for high-throughput applications; and (3) simpler alternatives like better prompting, fine-tuning, or RLHF often achieve similar quality improvements more efficiently.
 
-However, contrastive decoding might be justified in specific scenarios: high-stakes applications where quality is paramount (legal, medical, safety-critical systems), research settings where computational cost is secondary to performance, or specialized domains where the amateur-expert pairing provides unique benefits. The technique is also valuable for research into model behavior and as inspiration for more efficient methods.
-
-Overall, while contrastive decoding demonstrates interesting theoretical properties and can improve generation quality, its practical adoption is limited by computational costs. It's more likely to influence the development of more efficient techniques rather than see widespread direct deployment. 
+However, contrastive decoding might be justified in specific scenarios: high-stakes applications where quality is paramount (legal, medical, safety-critical systems), research settings where computational cost is secondary to performance, or specialized domains where the amateur-expert pairing provides unique benefits.
